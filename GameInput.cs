@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class GameInput : MonoBehaviour
 {
@@ -10,10 +9,9 @@ public class GameInput : MonoBehaviour
         playerInputActions = new PlayerInputActions();
         playerInputActions.Player.Enable();
     }
+
     public Vector2 GetMovementVectorNormalized()
     {
-        Vector2 inputVector = playerInputActions.Player.Move.ReadValue<Vector2>();
-
-        return inputVector.normalized;
+        return playerInputActions.Player.Move.ReadValue<Vector2>().normalized;
     }
 }
