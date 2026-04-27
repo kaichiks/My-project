@@ -3,32 +3,49 @@ using System;
 
 public class HealthSystem : MonoBehaviour
 {
-    [SerializeField] private float maxHP = 100f;
-    private float currentHP;
+    public event EventHandler OnHealthChanged;
+    public event EventHandler OnDeath;
 
-    public event Action OnHealthChanged;
+    [SerializeField] private int maxHP = 100;
+    [SerializeField] private float healthDecreaseRate = 5f; // HP lost per second
+
+    private float currentHP;
 
     private void Awake()
     {
         currentHP = maxHP;
     }
 
-    public void TakeDamage(float damage)
+    private void Update()
     {
-        currentHP -= damage;
-        currentHP = Mathf.Clamp(currentHP, 0, maxHP);
+        if (currentHP <= 0) return;
 
-        OnHealthChanged?.Invoke();
-        Debug.Log(gameObject.name + " HP: " + currentHP);
+        currentHP -= healthDecreaseRate * Time.deltaTime;
+        currentHP = Mathf.Max(currentHP, 0);
+        OnHealthChanged?.Invoke(this, EventArgs.Empty);
 
         if (currentHP <= 0)
-        {
-            Destroy(gameObject);
-        }
+            OnDeath?.Invoke(this, EventArgs.Empty);
     }
 
-    public float GetHealthNormalized()
+    public void TakeDamage(int amount)
     {
-        return currentHP / maxHP;
+        if (currentHP <= 0) return;
+
+        currentHP = Mathf.Clamp(currentHP - amount, 0, maxHP);
+        OnHealthChanged?.Invoke(this, EventArgs.Empty);
+
+        if (currentHP <= 0)
+            OnDeath?.Invoke(this, EventArgs.Empty);
     }
+
+    public void Heal(float amount)
+    {
+        currentHP = Mathf.Clamp(currentHP + amount, 0, maxHP);
+        OnHealthChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public float GetHealthNormalized() => currentHP / maxHP;
+
+    public bool IsDead() => currentHP <= 0;
 }
