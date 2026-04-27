@@ -1,6 +1,4 @@
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class Player : MonoBehaviour
 {
@@ -8,10 +6,9 @@ public class Player : MonoBehaviour
     [SerializeField] private float rotationSpeed = 10f;
     [SerializeField] private GameInput gameInput;
 
-    private bool isWalking;
-
-    float playerSize = 0.7f;
-    float playerHeight = 2f;
+    private bool isRunning;
+    private const float PLAYER_SIZE = 0.7f;
+    private const float PLAYER_HEIGHT = 2f;
 
     private void Update()
     {
@@ -21,54 +18,29 @@ public class Player : MonoBehaviour
     private void HandleMovement()
     {
         Vector2 inputVector = gameInput.GetMovementVectorNormalized();
-        Vector3 flatmoveDir = new Vector3(inputVector.x, 0.0f, inputVector.y);
+
+        // Auto-run forward, allow left/right steering from input
+        Vector3 moveDir = new Vector3(inputVector.x, 0f, 1f).normalized;
 
         float moveDistance = moveSpeed * Time.deltaTime;
 
-        bool canMove = !Physics.CapsuleCast(transform.position, transform.position + Vector3.up * playerHeight, playerSize, flatmoveDir,moveDistance );
-
-        if (!canMove)
-        {
-            //Attempt to move only on x axis
-            Vector3 flatmoveDirX = new Vector3(flatmoveDir.x, 0, 0).normalized;
-            canMove = !Physics.CapsuleCast(transform.position, transform.position + Vector3.up * playerHeight, playerSize, flatmoveDirX, moveDistance);
-
-            if(canMove)
-            {
-                flatmoveDir = flatmoveDirX; 
-            }
-            else
-            {
-                //Attempt to move only on z-axis
-                Vector3 flatmoveDirZ = new Vector3(0,0,flatmoveDir.z).normalized;
-                canMove = !Physics.CapsuleCast(transform.position, transform.position + Vector3.up * playerHeight, playerSize, flatmoveDirZ, moveDistance);
-
-                if(canMove)
-                {
-                    flatmoveDir = flatmoveDirZ;
-                }
-                else
-                {
-                    //Do not move
-                }
-            }
-        }
+        bool canMove = !Physics.CapsuleCast(
+            transform.position,
+            transform.position + Vector3.up * PLAYER_HEIGHT,
+            PLAYER_SIZE, moveDir, moveDistance);
 
         if (canMove)
         {
-            transform.position += flatmoveDir * moveDistance;
+            transform.position += moveDir * moveDistance;
         }
 
-        isWalking = flatmoveDir != Vector3.zero;
+        isRunning = canMove;
 
-        if (flatmoveDir != Vector3.zero)
+        if (moveDir != Vector3.zero)
         {
-            transform.forward = Vector3.Slerp(transform.forward, flatmoveDir, rotationSpeed * Time.deltaTime);
+            transform.forward = Vector3.Slerp(transform.forward, moveDir, rotationSpeed * Time.deltaTime);
         }
     }
 
-    public bool IsWalking()
-    {
-        return isWalking;
-    }
+    public bool IsRunning() => isRunning;
 }
