@@ -19,7 +19,6 @@ public class Player : MonoBehaviour
     {
         Vector2 inputVector = gameInput.GetMovementVectorNormalized();
 
-        // Auto-run forward, allow left/right steering from input
         Vector3 moveDir = new Vector3(inputVector.x, 0f, 1f).normalized;
 
         float moveDistance = moveSpeed * Time.deltaTime;
