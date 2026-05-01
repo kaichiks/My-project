@@ -1,331 +1,10 @@
 
-//using UnityEngine;
-
-//[RequireComponent(typeof(CharacterController))]
-//public class RunnerNPC : MonoBehaviour
-//{
-//    [Header("References")]
-//    public MarathonPath path;
-
-//    [Header("Path Follow")]
-//    public int currentPoint = 0;
-//    public float pointReachDistance = 0.5f;
-
-//    [Header("Movement")]
-//    public float speed = 4.0f;
-//    public float rotationSpeed = 8.0f;
-
-//    [Header("Lane Movement")]
-//    public int targetLane = 0;          // -1 = left, 0 = center, 1 = right
-//    public float laneWidth = 2.0f;
-//    public float laneChangeSpeed = 8.0f;
-
-//    private float currentLaneOffset = 0.0f;
-
-//    [Header("Lane Scan")]
-//    public int laneScanSteps = 3;
-//    public float laneScanSpacing = 1.5f;
-
-//    [Header("Obstacle Detection")]
-//    public LayerMask obstacleLayer;
-//    public float obstacleCheckDistance = 3.0f;
-//    public float obstacleCheckRadius = 1.5f;
-//    public float dodgeCooldown = 0.7f;
-
-//    private float dodgeCooldownTimer = 0.0f;
-
-//    private CharacterController controller;
-
-//    void Start()
-//    {
-//        controller = GetComponent<CharacterController>();
-
-//        if (currentPoint < 0)
-//            currentPoint = 0;
-//    }
-
-//    void Update()
-//    {
-//        if (path == null)
-//        {
-//            Debug.LogError("Path is not assigned.");
-//            return;
-//        }
-
-//        if (path.PointCount() < 2)
-//        {
-//            Debug.LogError("Path needs at least 2 points.");
-//            return;
-//        }
-
-//        if (currentPoint >= path.PointCount() - 1)
-//        {
-//            // Reached end, stop.
-//            return;
-//        }
-
-//        if (dodgeCooldownTimer > 0.0f)
-//            dodgeCooldownTimer -= Time.deltaTime;
-
-//        CheckObstacleAndDodge();
-
-//        MoveAlongPath();
-//    }
-
-//    void CheckObstacleAndDodge()
-//    {
-//        if (dodgeCooldownTimer > 0.0f)
-//            return;
-
-//        Vector3 currentPathPoint = path.GetPoint(currentPoint);
-//        Vector3 nextPathPoint = path.GetPoint(currentPoint + 1);
-
-//        Vector3 forwardDir = nextPathPoint - currentPathPoint;
-//        forwardDir.y = 0.0f;
-
-//        if (forwardDir.sqrMagnitude < 0.001f)
-//            return;
-
-//        forwardDir.Normalize();
-
-//        Vector3 rightDir = Vector3.Cross(Vector3.up, forwardDir).normalized;
-
-//        int mask = obstacleLayer.value;
-
-//        if (mask == 0)
-//        {
-//            Debug.LogWarning("Obstacle Layer is empty. Using Everything.");
-//            mask = ~0;
-//        }
-
-//        // Use the lane scan directly.
-//        bool frontBlocked = !IsLaneFree(targetLane, forwardDir, rightDir, mask);
-
-//        if (!frontBlocked)
-//        {
-//            Debug.Log("Current lane is free");
-//            return;
-//        }
-
-//        Debug.Log("Obstacle detected in current lane");
-
-//        int newLane = FindBestFreeLane(forwardDir, rightDir, mask);
-
-//        if (newLane == targetLane)
-//        {
-//            Debug.LogWarning("Obstacle detected, but no free lane.");
-//            return;
-//        }
-
-//        Debug.Log("Dodge from lane " + targetLane + " to lane " + newLane);
-
-//        targetLane = newLane;
-//        dodgeCooldownTimer = dodgeCooldown;
-//    }
-
-//    bool IsLaneFree(int lane, Vector3 forwardDir, Vector3 rightDir, int mask)
-//    {
-//        if (lane < -1 || lane > 1)
-//            return false;
-
-//        for (int i = 1; i <= laneScanSteps; i++)
-//        {
-//            Vector3 checkCenter =
-//                transform.position +
-//                rightDir * (lane * laneWidth) +
-//                forwardDir * (i * laneScanSpacing) +
-//                Vector3.up * 0.7f;
-
-//            Collider[] hits = Physics.OverlapSphere(
-//                checkCenter,
-//                obstacleCheckRadius,
-//                mask,
-//                QueryTriggerInteraction.Collide
-//            );
-
-//            if (hits.Length > 0)
-//            {
-//                Debug.Log("Lane " + lane + " blocked by " + hits[0].name);
-//                return false;
-//            }
-//        }
-
-//        Debug.Log("Lane " + lane + " is free");
-//        return true;
-//    }
-
-//    void MoveAlongPath()
-//    {
-//        Vector3 currentPathPoint = path.GetPoint(currentPoint);
-//        Vector3 nextPathPoint = path.GetPoint(currentPoint + 1);
-
-//        Vector3 forwardDir = nextPathPoint - currentPathPoint;
-//        forwardDir.y = 0.0f;
-
-//        if (forwardDir.sqrMagnitude < 0.001f)
-//            return;
-
-//        forwardDir.Normalize();
-
-//        Vector3 rightDir = Vector3.Cross(Vector3.up, forwardDir).normalized;
-
-//        float targetLaneOffset = targetLane * laneWidth;
-
-//        float oldLaneOffset = currentLaneOffset;
-
-//        currentLaneOffset = Mathf.MoveTowards(
-//            currentLaneOffset,
-//            targetLaneOffset,
-//            laneChangeSpeed * Time.deltaTime
-//        );
-
-//        float laneDelta = currentLaneOffset - oldLaneOffset;
-
-//        Vector3 move =
-//            forwardDir * speed * Time.deltaTime +
-//            rightDir * laneDelta;
-
-//        controller.Move(move);
-
-//        Quaternion targetRot = Quaternion.LookRotation(forwardDir);
-//        transform.rotation = Quaternion.Slerp(
-//            transform.rotation,
-//            targetRot,
-//            rotationSpeed * Time.deltaTime
-//        );
-
-//        Vector3 toNext = nextPathPoint - transform.position;
-//        toNext.y = 0.0f;
-
-//        if (Vector3.Dot(toNext, forwardDir) <= pointReachDistance)
-//        {
-//            currentPoint++;
-
-//            if (currentPoint >= path.PointCount() - 1)
-//                currentPoint = path.PointCount() - 1;
-//        }
-//    }
-//    int FindBestFreeLane(Vector3 forwardDir, Vector3 rightDir, int mask)
-//    {
-//        bool leftFree = IsLaneFree(-1, forwardDir, rightDir, mask);
-//        bool centerFree = IsLaneFree(0, forwardDir, rightDir, mask);
-//        bool rightFree = IsLaneFree(1, forwardDir, rightDir, mask);
-
-//        Debug.Log(
-//            "Free lanes: Left=" + leftFree +
-//            " Center=" + centerFree +
-//            " Right=" + rightFree
-//        );
-
-//        if (targetLane == -1)
-//        {
-//            if (centerFree) return 0;
-//            if (rightFree) return 1;
-//        }
-//        else if (targetLane == 0)
-//        {
-//            if (leftFree && rightFree)
-//                return Random.value < 0.5f ? -1 : 1;
-
-//            if (leftFree) return -1;
-//            if (rightFree) return 1;
-//        }
-//        else if (targetLane == 1)
-//        {
-//            if (centerFree) return 0;
-//            if (leftFree) return -1;
-//        }
-
-//        return targetLane;
-//    }
-
-//    void OnDrawGizmos()
-//    {
-//        if (path == null || path.PointCount() < 2)
-//            return;
-
-//        int safePoint = Mathf.Clamp(currentPoint, 0, path.PointCount() - 2);
-
-//        Vector3 currentPathPoint = path.GetPoint(safePoint);
-//        Vector3 nextPathPoint = path.GetPoint(safePoint + 1);
-
-//        Vector3 forwardDir = nextPathPoint - currentPathPoint;
-//        forwardDir.y = 0.0f;
-
-//        if (forwardDir.sqrMagnitude < 0.001f)
-//            return;
-
-//        forwardDir.Normalize();
-
-//        Vector3 rightDir = Vector3.Cross(Vector3.up, forwardDir).normalized;
-
-//        DrawLaneScan(-1, rightDir, forwardDir, Color.green);
-//        DrawLaneScan(0, rightDir, forwardDir, Color.yellow);
-//        DrawLaneScan(1, rightDir, forwardDir, Color.green);
-//    }
-
-//    void DrawLaneScan(int lane, Vector3 rightDir, Vector3 forwardDir, Color color)
-//    {
-//        Gizmos.color = color;
-
-//        for (int i = 1; i <= laneScanSteps; i++)
-//        {
-//            Vector3 center =
-//                transform.position +
-//                rightDir * (lane * laneWidth) +
-//                forwardDir * (i * laneScanSpacing) +
-//                Vector3.up * 0.7f;
-
-//            Gizmos.DrawWireSphere(center, obstacleCheckRadius);
-//        }
-//    }
-//    void DrawLaneSphere(
-//        int lane,
-//        Vector3 rightDir,
-//        Vector3 forwardDir,
-//        Color color
-//    )
-//    {
-//        Gizmos.color = color;
-
-//        Vector3 center =
-//            transform.position +
-//            rightDir * (lane * laneWidth) +
-//            forwardDir * obstacleCheckDistance +
-//            Vector3.up * 0.7f;
-
-//        Gizmos.DrawWireSphere(center, obstacleCheckRadius);
-//    }
-
-//    //void DrawLaneBox(
-//    //    int lane,
-//    //    Vector3 rightDir,
-//    //    Vector3 forwardDir,
-//    //    Quaternion rotation,
-//    //    Vector3 halfExtents,
-//    //    Color color
-//    //)
-//    //{
-//    //    Gizmos.color = color;
-
-//    //    Vector3 center =
-//    //        transform.position +
-//    //        rightDir * (lane * laneWidth) +
-//    //        forwardDir * (obstacleCheckDistance * 0.5f) +
-//    //        Vector3.up * 0.7f;
-
-//    //    Matrix4x4 oldMatrix = Gizmos.matrix;
-//    //    Gizmos.matrix = Matrix4x4.TRS(center, rotation, Vector3.one);
-//    //    Gizmos.DrawWireCube(Vector3.zero, halfExtents * 2.0f);
-//    //    Gizmos.matrix = oldMatrix;
-//    //}
-//}
-
 using UnityEngine;
 using UnityEngine.AI;
 
 public class RunnerNPC : MonoBehaviour
 {
+
     [Header("Race Path")]
     public Transform[] checkpoints;
     public bool loopRace = true;
@@ -339,26 +18,31 @@ public class RunnerNPC : MonoBehaviour
 
     [Header("Obstacle Dodge")]
     public LayerMask obstacleLayer;
-    public float obstacleCheckDistance = 3.0f;
-    public float obstacleCheckRadius = 0.45f;
-    public float sideDodgeDistance = 1.8f;
-    public float forwardDodgeDistance = 4.0f;
-    public float dodgeFinishDistance = 0.8f;
-    private float obstacleIgnoreTimer = 0.0f;
-    public float obstacleIgnoreAfterDodge = 1.0f;
+    public float obstacleCheckDistance = 2.0f;
+    public float obstacleCheckRadius = 0.35f;
+    public float sideDodgeDistance = 0.9f;
+    public float forwardDodgeDistance = 2.0f;
+    public float dodgeFinishDistance = 0.5f;
+    public float maxDodgeTime = 0.6f;
+    public float obstacleIgnoreAfterDodge = 0.25f;
 
-    private bool isDodging;
-    private Vector3 dodgeTarget;
+    private float obstacleIgnoreTimer = 0.0f;
 
     [Header("Lane Offset")]
-    public float laneOffset = 1.0f;
+    public float laneOffset = 0.6f;
     public bool randomLaneOnStart = true;
 
     [Header("Avoid Other Racers")]
     public LayerMask racerLayer;
-    public float avoidCheckDistance = 3.0f;
+    public float avoidCheckDistance = 1.8f;
     public float avoidRadius = 0.7f;
-    public float avoidStrength = 1.5f;
+    public float avoidStrength = 0.8f;
+
+    [Header("Follow Racer After Obstacle")]
+    public float freshlyAvoidedObstacleTime = 1.0f;
+    public float followRacerTime = 0.8f;
+    public float followBehindDistance = 1.4f;
+    public float followSideOffset = 0.25f;
 
     [Header("Animation")]
     public Animator animator;
@@ -369,6 +53,22 @@ public class RunnerNPC : MonoBehaviour
     private float currentSpeed;
     private float myLaneOffset;
 
+    private enum RaceState
+    {
+        FollowPath,
+        DodgeObstacle,
+        FollowRacer
+    }
+
+    private RaceState state = RaceState.FollowPath;
+
+    private Vector3 dodgeTarget;
+    private float dodgeTimer;
+
+    private Transform targetRacer;
+    private float followRacerTimer;
+
+    private float freshlyAvoidedObstacleTimer;
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -411,20 +111,32 @@ public class RunnerNPC : MonoBehaviour
         if (obstacleIgnoreTimer > 0.0f)
             obstacleIgnoreTimer -= Time.deltaTime;
 
-        if (isDodging)
+        switch (state)
         {
-            UpdateDodge();
-        }
-        else
-        {
-            CheckCheckpointReached();
+            case RaceState.FollowPath:
+                CheckCheckpointReached();
 
-            if (obstacleIgnoreTimer <= 0.0f)
-            {
-                CheckObstacleAndStartDodge();
-            }
+                if (obstacleIgnoreTimer <= 0.0f)
+                {
+                    CheckObstacleAndStartDodge();
+                    if (state == RaceState.FollowPath && freshlyAvoidedObstacleTimer > 0.0f)
+                    {
+                        CheckRacerAndStartFollow();
+                    }
+                    if (state == RaceState.FollowPath)
+                    {
+                        AvoidOtherRacers();
+                    }
+                }
+                break;
 
-            AvoidOtherRacers();
+            case RaceState.DodgeObstacle:
+                UpdateDodge();
+                break;
+
+            case RaceState.FollowRacer:
+                UpdateFollowRacer();
+                break;
         }
 
         UpdateSpeed();
@@ -487,13 +199,29 @@ public class RunnerNPC : MonoBehaviour
         }
     }
 
+    private bool IsTargetInside90Degrees(Vector3 target)
+    {
+        Vector3 toTarget = target - transform.position;
+        toTarget.y = 0.0f;
+
+        if (toTarget.sqrMagnitude < 0.001f)
+            return true;
+
+        toTarget.Normalize();
+
+        float dot = Vector3.Dot(transform.forward, toTarget);
+
+        // dot >= 0 ‚¾‚Á‚½‚çtarget‚Í‚P‚W‚O“xˆÈ“à
+        // npc‚ª¶‰E90“xÅ‘å‚µ‚©‚µ‹È‚ª‚ê‚È‚¢
+        return dot >= 0.0f;
+    }
+
     private Vector3 GetOffsetCheckpointPosition()
     {
         Transform checkpoint = checkpoints[currentCheckpoint];
 
         Vector3 targetPosition = checkpoint.position;
 
-        // use checkpoint's right direction for lane offset
         Vector3 right = checkpoint.right;
         targetPosition += right * myLaneOffset;
 
@@ -506,68 +234,86 @@ public class RunnerNPC : MonoBehaviour
         return checkpoint.position;
     }
 
-    private void UpdateSpeed()
-    {
-        float distanceToCheckpoint = Vector3.Distance(
-            transform.position,
-            checkpoints[currentCheckpoint].position
-        );
-
-        float targetSpeed = maxSpeed;
-
-        // Slow down when near checkpoint/corner
-        if (distanceToCheckpoint < turnSlowDownDistance)
-        {
-            targetSpeed = baseSpeed;
-        }
-
-        currentSpeed = Mathf.MoveTowards(
-            currentSpeed,
-            targetSpeed,
-            acceleration * Time.deltaTime
-        );
-
-        agent.speed = currentSpeed;
-    }
-
-    private void AvoidOtherRacers()
+    private void CheckRacerAndStartFollow()
     {
         Vector3 origin = transform.position + Vector3.up * 0.7f;
-        Vector3 forward = transform.forward;
 
         Collider[] hits = Physics.OverlapSphere(
-            origin + forward * avoidCheckDistance,
-            avoidRadius,
+            origin,
+            avoidRadius * 1.5f,
             racerLayer
         );
 
         if (hits.Length == 0)
             return;
 
-        Vector3 avoidDirection = Vector3.zero;
+        Transform bestRacer = null;
+        float bestDistance = float.MaxValue;
 
         foreach (Collider hit in hits)
         {
             if (hit.gameObject == gameObject)
                 continue;
 
-            Vector3 away = transform.position - hit.transform.position;
-            away.y = 0f;
+            Vector3 toOther = hit.transform.position - transform.position;
+            toOther.y = 0.0f;
 
-            if (away.sqrMagnitude > 0.001f)
+            if (toOther.sqrMagnitude < 0.001f)
+                continue;
+
+            float frontDot = Vector3.Dot(transform.forward, toOther.normalized);
+
+            // allow racer in front or beside
+            if (frontDot < -0.2f)
+                continue;
+
+            float distance = toOther.magnitude;
+
+            if (distance < bestDistance)
             {
-                avoidDirection += away.normalized;
+                bestDistance = distance;
+                bestRacer = hit.transform;
             }
         }
 
-        if (avoidDirection == Vector3.zero)
+        if (bestRacer == null)
             return;
 
-        Vector3 newTarget = agent.destination + avoidDirection.normalized * avoidStrength;
+        targetRacer = bestRacer;
+        followRacerTimer = followRacerTime;
+        state = RaceState.FollowRacer;
+    }
 
-        if (NavMesh.SamplePosition(newTarget, out NavMeshHit navHit, 2.0f, NavMesh.AllAreas))
+    private void UpdateFollowRacer()
+    {
+        followRacerTimer -= Time.deltaTime;
+
+        if (targetRacer == null)
         {
-            agent.SetDestination(navHit.position);
+            ReturnToPath();
+            return;
+        }
+
+        Vector3 followTarget =
+            targetRacer.position
+            - targetRacer.forward * followBehindDistance
+            + targetRacer.right * followSideOffset;
+
+        if (NavMesh.SamplePosition(followTarget, out NavMeshHit hit, 1.5f, NavMesh.AllAreas))
+        {
+            if (IsTargetInside90Degrees(hit.position))
+            {
+                agent.SetDestination(hit.position);
+            }
+            else
+            {
+                ReturnToPath();
+            }
+        }
+
+        if (followRacerTimer <= 0.0f)
+        {
+            ReturnToPath();
         }
     }
 
@@ -602,21 +348,19 @@ public class RunnerNPC : MonoBehaviour
         bool leftOk = NavMesh.SamplePosition(
             leftTarget,
             out NavMeshHit leftHit,
-            1.5f,
+            1.0f,
             NavMesh.AllAreas
         );
 
         bool rightOk = NavMesh.SamplePosition(
             rightTarget,
             out NavMeshHit rightHit,
-            1.5f,
+            1.0f,
             NavMesh.AllAreas
         );
 
         if (!leftOk && !rightOk)
-        {
             return;
-        }
 
         if (leftOk && rightOk)
         {
@@ -630,24 +374,156 @@ public class RunnerNPC : MonoBehaviour
             dodgeTarget = leftOk ? leftHit.position : rightHit.position;
         }
 
-        isDodging = true;
+        StartDodge(dodgeTarget);
+    }
+
+    private void ReturnToPath()
+    {
+        targetRacer = null;
+
+        state = RaceState.FollowPath;
+
+        obstacleIgnoreTimer = obstacleIgnoreAfterDodge;
+
+        agent.isStopped = false;
+
+        MoveToCurrentCheckpoint();
+    }
+
+    private void UpdateSpeed()
+    {
+        float distanceToCheckpoint = Vector3.Distance(
+            transform.position,
+            checkpoints[currentCheckpoint].position
+        );
+
+        float targetSpeed = maxSpeed;
+
+        if (distanceToCheckpoint < turnSlowDownDistance)
+        {
+            targetSpeed = baseSpeed;
+        }
+
+        currentSpeed = Mathf.MoveTowards(
+            currentSpeed,
+            targetSpeed,
+            acceleration * Time.deltaTime
+        );
+
+        agent.speed = currentSpeed;
+    }
+
+    private void AvoidOtherRacers()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.7f;
+        Vector3 forward = transform.forward;
+
+        Collider[] hits = Physics.OverlapSphere(
+            origin + forward * avoidCheckDistance,
+            avoidRadius,
+            racerLayer
+        );
+
+        if (hits.Length == 0)
+            return;
+
+        foreach (Collider hit in hits)
+        {
+            if (hit.gameObject == gameObject)
+                continue;
+
+            Vector3 toOther = hit.transform.position - transform.position;
+            toOther.y = 0.0f;
+
+            if (toOther.sqrMagnitude < 0.001f)
+                continue;
+
+            // only avoid racers in front
+            if (Vector3.Dot(transform.forward, toOther.normalized) < 0.3f)
+                continue;
+
+            Vector3 leftTarget =
+                transform.position
+                - transform.right * sideDodgeDistance
+                + transform.forward * forwardDodgeDistance;
+
+            Vector3 rightTarget =
+                transform.position
+                + transform.right * sideDodgeDistance
+                + transform.forward * forwardDodgeDistance;
+
+            bool leftOk = NavMesh.SamplePosition(
+                leftTarget,
+                out NavMeshHit leftHit,
+                1.0f,
+                NavMesh.AllAreas
+            );
+
+            bool rightOk = NavMesh.SamplePosition(
+                rightTarget,
+                out NavMeshHit rightHit,
+                1.0f,
+                NavMesh.AllAreas
+            );
+
+            if (!leftOk && !rightOk)
+                return;
+
+            if (leftOk && rightOk)
+            {
+                float leftDistance = Vector3.Distance(leftHit.position, checkpoints[currentCheckpoint].position);
+                float rightDistance = Vector3.Distance(rightHit.position, checkpoints[currentCheckpoint].position);
+
+                dodgeTarget = leftDistance < rightDistance ? leftHit.position : rightHit.position;
+            }
+            else
+            {
+                dodgeTarget = leftOk ? leftHit.position : rightHit.position;
+            }
+
+            StartDodge(dodgeTarget);
+            return;
+        }
+    }
+
+    private void StartDodge(Vector3 target)
+    {
+        if (!IsTargetInside90Degrees(target))
+        {
+            ReturnToPath();
+            return;
+        }
+
+        dodgeTarget = target;
+        dodgeTimer = maxDodgeTime;
+
+        state = RaceState.DodgeObstacle;
+
+        agent.isStopped = false;
         agent.SetDestination(dodgeTarget);
     }
+
 
     private void UpdateDodge()
     {
         if (agent.pathPending)
             return;
 
+        dodgeTimer -= Time.deltaTime;
+
         if (agent.remainingDistance <= dodgeFinishDistance)
         {
-            isDodging = false;
+            //isDodging = false;
 
-            obstacleIgnoreTimer = obstacleIgnoreAfterDodge;
+            //obstacleIgnoreTimer = obstacleIgnoreAfterDodge;
 
-            agent.isStopped = false;
+            //agent.isStopped = false;
 
-            MoveToCurrentCheckpoint();
+            //MoveToCurrentCheckpoint();
+
+            freshlyAvoidedObstacleTimer = freshlyAvoidedObstacleTime;
+
+            ReturnToPath();
         }
     }
 
@@ -664,7 +540,18 @@ public class RunnerNPC : MonoBehaviour
         Gizmos.color = Color.yellow;
 
         Vector3 origin = transform.position + Vector3.up * 0.7f;
-        Gizmos.DrawWireSphere(origin + transform.forward * avoidCheckDistance, avoidRadius);
+
+        Gizmos.DrawWireSphere(
+            origin + transform.forward * avoidCheckDistance,
+            avoidRadius
+        );
+
+        Gizmos.color = Color.red;
+
+        Gizmos.DrawWireSphere(
+            origin + transform.forward * obstacleCheckDistance,
+            obstacleCheckRadius
+        );
 
         if (checkpoints != null)
         {
