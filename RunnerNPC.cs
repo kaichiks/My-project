@@ -158,15 +158,11 @@ public class RunnerNPC : MonoBehaviour
 
         if (currentCheckpoint >= checkpoints.Length)
         {
-            if (loopRace)
-            {
-                currentCheckpoint = 0;
-            }
-            else
-            {
-                agent.ResetPath();
-                return;
-            }
+            agent.isStopped = true;
+            agent.ResetPath();
+            currentSpeed = 0.0f;
+            agent.speed = 0.0f;
+            return;
         }
 
         MoveToCurrentCheckpoint();
