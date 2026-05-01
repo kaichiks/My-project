@@ -1,10 +1,11 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class EnemyHealthBar : MonoBehaviour
 {
-    [SerializeField] private Transform healthBarFill;
-     private Transform cam;
+    [SerializeField] private Image healthBarFill;  
 
+    private Transform cam;
     private HealthSystem healthSystem;
     private Canvas canvas;
 
@@ -16,13 +17,11 @@ public class EnemyHealthBar : MonoBehaviour
 
         healthSystem.OnHealthChanged += UpdateBar;
 
-        // Hide bar at full HP
-        canvas.enabled = false;
+        UpdateBar(this, System.EventArgs.Empty);
     }
 
     private void LateUpdate()
     {
-        // Always face the camera
         transform.rotation = Quaternion.LookRotation(
             transform.position - cam.position
         );
@@ -30,14 +29,13 @@ public class EnemyHealthBar : MonoBehaviour
 
     private void OnDestroy()
     {
-        healthSystem.OnHealthChanged -= UpdateBar;
+        if (healthSystem != null)
+            healthSystem.OnHealthChanged -= UpdateBar;
     }
 
-    private void UpdateBar()
+    private void UpdateBar(object sender, System.EventArgs e)
     {
-        canvas.enabled = true;
-        healthBarFill.transform.localScale = new Vector3(
-        healthSystem.GetHealthNormalized(), 1f, 1f
-    );
+        if (healthBarFill != null && healthSystem != null)
+            healthBarFill.fillAmount = healthSystem.GetHealthNormalized();
     }
 }
