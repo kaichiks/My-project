@@ -53,12 +53,44 @@ public class RunnerNPC : MonoBehaviour
     private float currentSpeed;
     private float myLaneOffset;
 
+    [Header("Status Effect")]
+    private float slowTimer = 0.0f;
+    private float slowMultiplier = 1.0f;
+
+    [Header("Stun Collision")]
+    public string normalRacerLayerName = "NPC";
+    public string stunnedRacerLayerName = "StunnedNPC";
+
+    private int normalRacerLayer;
+    private int stunnedRacerLayer;
+
     private enum RaceState
     {
         FollowPath,
         DodgeObstacle,
         FollowRacer
     }
+
+    public enum ItemType
+    {
+        None,
+        Hanabi
+    }
+
+    [Header("Item")]
+    public bool canUseItems = true;
+    public ItemType currentItem = ItemType.None;
+
+    public GameObject fireworkPrefab;
+    public Transform itemThrowPoint;
+
+    public float itemUseRange = 5.0f;
+    public float itemUseCooldown = 4.0f;
+    public float itemUseChance = 0.35f;
+
+    public bool onlyUseItemOnRacerInFront = true;
+
+    private float itemCooldownTimer = 0.0f;
 
     private RaceState state = RaceState.FollowPath;
 
@@ -69,6 +101,18 @@ public class RunnerNPC : MonoBehaviour
     private float followRacerTimer;
 
     private float freshlyAvoidedObstacleTimer;
+
+    [Header("Hit Reaction")]
+    public float itemHitStopTime = 1.0f;
+    public float itemKnockUpHeight = 1.5f;
+    public float itemKnockBackDistance = 1.2f;
+
+    private bool isItemStunned = false;
+    private float itemStunTimer = 0.0f;
+
+    private Vector3 stunStartPosition;
+    private Vector3 stunEndPosition;
+
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -82,6 +126,9 @@ public class RunnerNPC : MonoBehaviour
         agent.autoBraking = false;
         agent.acceleration = acceleration;
         agent.speed = baseSpeed;
+
+        normalRacerLayer = LayerMask.NameToLayer(normalRacerLayerName);
+        stunnedRacerLayer = LayerMask.NameToLayer(stunnedRacerLayerName);
     }
 
     private void Start()
@@ -102,11 +149,21 @@ public class RunnerNPC : MonoBehaviour
 
     private void Update()
     {
+        if (itemCooldownTimer > 0.0f)
+            itemCooldownTimer -= Time.deltaTime;
+
         if (!agent.isOnNavMesh)
             return;
 
         if (checkpoints == null || checkpoints.Length == 0)
             return;
+
+        if (isItemStunned)
+        {
+            UpdateItemStun();
+            UpdateAnimation();
+            return;
+        }
 
         if (obstacleIgnoreTimer > 0.0f)
             obstacleIgnoreTimer -= Time.deltaTime;
@@ -115,6 +172,8 @@ public class RunnerNPC : MonoBehaviour
         {
             case RaceState.FollowPath:
                 CheckCheckpointReached();
+
+                TryUseItem();
 
                 if (obstacleIgnoreTimer <= 0.0f)
                 {
@@ -141,6 +200,19 @@ public class RunnerNPC : MonoBehaviour
 
         UpdateSpeed();
         UpdateAnimation();
+    }
+
+    private void SetLayerRecursively(GameObject obj, int layer)
+    {
+        if (layer < 0)
+            return;
+
+        obj.layer = layer;
+
+        foreach (Transform child in obj.transform)
+        {
+            SetLayerRecursively(child.gameObject, layer);
+        }
     }
 
     private void CheckCheckpointReached()
@@ -400,6 +472,17 @@ public class RunnerNPC : MonoBehaviour
             targetSpeed = baseSpeed;
         }
 
+        if (slowTimer > 0.0f)
+        {
+            slowTimer -= Time.deltaTime;
+            targetSpeed *= slowMultiplier;
+
+            if (slowTimer <= 0.0f)
+            {
+                slowMultiplier = 1.0f;
+            }
+        }
+
         currentSpeed = Mathf.MoveTowards(
             currentSpeed,
             targetSpeed,
@@ -407,6 +490,16 @@ public class RunnerNPC : MonoBehaviour
         );
 
         agent.speed = currentSpeed;
+    }
+
+    public void ApplySlow(float multiplier, float duration)
+    {
+        if (multiplier < slowMultiplier)
+        {
+            slowMultiplier = multiplier;
+        }
+
+        slowTimer = duration;
     }
 
     private void AvoidOtherRacers()
@@ -520,6 +613,205 @@ public class RunnerNPC : MonoBehaviour
             freshlyAvoidedObstacleTimer = freshlyAvoidedObstacleTime;
 
             ReturnToPath();
+        }
+    }
+
+    public void GiveRandomItem()
+    {
+        if (currentItem != ItemType.None)
+            return;
+
+        int random = Random.Range(0, 1);
+
+        switch (random)
+        {
+            case 0:
+                currentItem = ItemType.Hanabi;
+                break;
+        }
+
+        Debug.Log(gameObject.name + " picked up item: " + currentItem);
+    } //’Ç‰Á‚ ‚Á‚½‚ç“ü‚ê‚é
+
+    private void TryUseItem()
+    {
+        if (!canUseItems)
+            return;
+
+        if (currentItem == ItemType.None)
+            return;
+
+        if (itemCooldownTimer > 0.0f)
+            return;
+
+        Transform target = FindNearbyRacerForItem();
+
+        if (target == null)
+            return;
+
+        //if (Random.value > itemUseChance)
+        //    return;
+
+        switch (currentItem)
+        {
+            case ItemType.Hanabi:
+                LaunchFirework(target);
+                break;
+        }
+
+        currentItem = ItemType.None;
+        itemCooldownTimer = itemUseCooldown;
+    }
+
+    public void HitByItem(Vector3 hitFromPosition)
+    {
+        if (isItemStunned)
+            return;
+
+        isItemStunned = true;
+        itemStunTimer = itemHitStopTime;
+
+        SetLayerRecursively(gameObject, stunnedRacerLayer);
+
+        if (agent != null)
+        {
+            agent.isStopped = true;
+            agent.ResetPath();
+            agent.velocity = Vector3.zero;
+        }
+
+        Vector3 knockDirection = transform.position - hitFromPosition;
+        knockDirection.y = 0.0f;
+
+        if (knockDirection.sqrMagnitude < 0.001f)
+        {
+            knockDirection = -transform.forward;
+        }
+
+        knockDirection.Normalize();
+
+        stunStartPosition = transform.position;
+        stunEndPosition = transform.position + knockDirection * itemKnockBackDistance;
+    }
+
+    private void UpdateItemStun()
+    {
+        itemStunTimer -= Time.deltaTime;
+
+        float t = 1.0f - itemStunTimer / itemHitStopTime;
+        t = Mathf.Clamp01(t);
+
+        Vector3 position = Vector3.Lerp(stunStartPosition, stunEndPosition, t);
+
+        // fly up then come down
+        position.y += Mathf.Sin(t * Mathf.PI) * itemKnockUpHeight;
+
+        transform.position = position;
+
+        if (itemStunTimer <= 0.0f)
+        {
+            EndItemStun();
+        }
+    }
+
+    private void EndItemStun()
+    {
+        isItemStunned = false;
+
+        SetLayerRecursively(gameObject, normalRacerLayer);
+
+        // Put NPC back on NavMesh
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3.0f, NavMesh.AllAreas))
+        {
+            transform.position = hit.position;
+        }
+
+        if (agent != null)
+        {
+            agent.Warp(transform.position);
+            agent.isStopped = false;
+        }
+
+        MoveToCurrentCheckpoint();
+    }
+
+    private Transform FindNearbyRacerForItem()
+    {
+        Vector3 origin = transform.position + Vector3.up * 0.7f;
+
+        Collider[] hits = Physics.OverlapSphere(
+            origin,
+            itemUseRange,
+            racerLayer
+        );
+
+        Transform bestTarget = null;
+        float bestDistance = float.MaxValue;
+
+        foreach (Collider hit in hits)
+        {
+            if (hit.gameObject == gameObject)
+                continue;
+
+            Vector3 toOther = hit.transform.position - transform.position;
+            toOther.y = 0.0f;
+
+            if (toOther.sqrMagnitude < 0.001f)
+                continue;
+
+            Vector3 dir = toOther.normalized;
+
+            if (onlyUseItemOnRacerInFront)
+            {
+                float dot = Vector3.Dot(transform.forward, dir);
+
+                if (dot < 0.2f)
+                    continue;
+            }
+
+            float distance = toOther.magnitude;
+
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestTarget = hit.transform;
+            }
+        }
+
+        return bestTarget;
+    }
+
+    private void LaunchFirework(Transform target)
+    {
+        if (fireworkPrefab == null)
+        {
+            Debug.LogWarning("Firework prefab is not assigned.");
+            return;
+        }
+
+        Vector3 spawnPosition;
+
+        if (itemThrowPoint != null)
+        {
+            spawnPosition = itemThrowPoint.position;
+        }
+        else
+        {
+            spawnPosition = transform.position + Vector3.up * 1.2f + transform.forward * 0.5f;
+        }
+
+        GameObject firework = Instantiate(
+            fireworkPrefab,
+            spawnPosition,
+            Quaternion.identity
+        );
+
+        FireworkProjectile projectile = firework.GetComponent<FireworkProjectile>();
+
+        if (projectile != null)
+        {
+            projectile.SetOwner(this);
+            projectile.LaunchTo(target.position);
         }
     }
 
