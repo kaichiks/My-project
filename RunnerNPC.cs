@@ -103,12 +103,16 @@ public class RunnerNPC : MonoBehaviour
     private float freshlyAvoidedObstacleTimer;
 
     [Header("Hit Reaction")]
-    public float itemHitStopTime = 1.0f;
+    public float itemFlyTime = 0.45f;
+    public float itemStunAfterFlyTime = 1.0f;
     public float itemKnockUpHeight = 1.5f;
     public float itemKnockBackDistance = 1.2f;
 
     private bool isItemStunned = false;
-    private float itemStunTimer = 0.0f;
+    private bool isFlyingFromItem = false;
+    private bool isStoppedAfterItemHit = false;
+
+    private float itemHitTimer = 0.0f;
 
     private Vector3 stunStartPosition;
     private Vector3 stunEndPosition;
@@ -151,6 +155,13 @@ public class RunnerNPC : MonoBehaviour
     {
         if (itemCooldownTimer > 0.0f)
             itemCooldownTimer -= Time.deltaTime;
+
+        if (isItemStunned)
+        {
+            UpdateItemStun();
+            UpdateAnimation();
+            return;
+        }
 
         if (!agent.isOnNavMesh)
             return;
@@ -663,13 +674,47 @@ public class RunnerNPC : MonoBehaviour
         itemCooldownTimer = itemUseCooldown;
     }
 
+    //public void HitByItem(Vector3 hitFromPosition)
+    //{
+    //    if (isItemStunned)
+    //        return;
+
+    //    isItemStunned = true;
+    //    itemStunTimer = itemHitStopTime;
+
+    //    SetLayerRecursively(gameObject, stunnedRacerLayer);
+
+    //    if (agent != null)
+    //    {
+    //        agent.isStopped = true;
+    //        agent.ResetPath();
+    //        agent.velocity = Vector3.zero;
+    //    }
+
+    //    Vector3 knockDirection = transform.position - hitFromPosition;
+    //    knockDirection.y = 0.0f;
+
+    //    if (knockDirection.sqrMagnitude < 0.001f)
+    //    {
+    //        knockDirection = -transform.forward;
+    //    }
+
+    //    knockDirection.Normalize();
+
+    //    stunStartPosition = transform.position;
+    //    stunEndPosition = transform.position + knockDirection * itemKnockBackDistance;
+    //}
+
     public void HitByItem(Vector3 hitFromPosition)
     {
         if (isItemStunned)
             return;
 
         isItemStunned = true;
-        itemStunTimer = itemHitStopTime;
+        isFlyingFromItem = true;
+        isStoppedAfterItemHit = false;
+
+        itemHitTimer = itemFlyTime;
 
         SetLayerRecursively(gameObject, stunnedRacerLayer);
 
@@ -679,6 +724,8 @@ public class RunnerNPC : MonoBehaviour
             agent.ResetPath();
             agent.velocity = Vector3.zero;
         }
+
+        currentSpeed = 0.0f;
 
         Vector3 knockDirection = transform.position - hitFromPosition;
         knockDirection.y = 0.0f;
@@ -694,33 +741,70 @@ public class RunnerNPC : MonoBehaviour
         stunEndPosition = transform.position + knockDirection * itemKnockBackDistance;
     }
 
+    //private void UpdateItemStun()
+    //{
+    //    itemStunTimer -= Time.deltaTime;
+
+    //    float t = 1.0f - itemStunTimer / itemHitStopTime;
+    //    t = Mathf.Clamp01(t);
+
+    //    Vector3 position = Vector3.Lerp(stunStartPosition, stunEndPosition, t);
+
+    //    // fly up then come down
+    //    position.y += Mathf.Sin(t * Mathf.PI) * itemKnockUpHeight;
+
+    //    transform.position = position;
+
+    //    if (itemStunTimer <= 0.0f)
+    //    {
+    //        EndItemStun();
+    //    }
+    //}
+
     private void UpdateItemStun()
     {
-        itemStunTimer -= Time.deltaTime;
-
-        float t = 1.0f - itemStunTimer / itemHitStopTime;
-        t = Mathf.Clamp01(t);
-
-        Vector3 position = Vector3.Lerp(stunStartPosition, stunEndPosition, t);
-
-        // fly up then come down
-        position.y += Mathf.Sin(t * Mathf.PI) * itemKnockUpHeight;
-
-        transform.position = position;
-
-        if (itemStunTimer <= 0.0f)
+        if (isFlyingFromItem)
         {
-            EndItemStun();
+            UpdateItemFly();
+            return;
+        }
+
+        if (isStoppedAfterItemHit)
+        {
+            UpdateStopAfterItemHit();
+            return;
         }
     }
+
+    //private void EndItemStun()
+    //{
+    //    isItemStunned = false;
+
+    //    SetLayerRecursively(gameObject, normalRacerLayer);
+
+    //    // Put NPC back on NavMesh
+    //    if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3.0f, NavMesh.AllAreas))
+    //    {
+    //        transform.position = hit.position;
+    //    }
+
+    //    if (agent != null)
+    //    {
+    //        agent.Warp(transform.position);
+    //        agent.isStopped = false;
+    //    }
+
+    //    MoveToCurrentCheckpoint();
+    //}
 
     private void EndItemStun()
     {
         isItemStunned = false;
+        isFlyingFromItem = false;
+        isStoppedAfterItemHit = false;
 
         SetLayerRecursively(gameObject, normalRacerLayer);
 
-        // Put NPC back on NavMesh
         if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3.0f, NavMesh.AllAreas))
         {
             transform.position = hit.position;
@@ -730,9 +814,70 @@ public class RunnerNPC : MonoBehaviour
         {
             agent.Warp(transform.position);
             agent.isStopped = false;
+            agent.speed = baseSpeed;
         }
 
+        currentSpeed = baseSpeed;
+
         MoveToCurrentCheckpoint();
+    }
+
+    private void UpdateItemFly()
+    {
+        itemHitTimer -= Time.deltaTime;
+
+        float t = 1.0f - itemHitTimer / itemFlyTime;
+        t = Mathf.Clamp01(t);
+
+        Vector3 position = Vector3.Lerp(stunStartPosition, stunEndPosition, t);
+
+        // fly up and land
+        position.y += Mathf.Sin(t * Mathf.PI) * itemKnockUpHeight;
+
+        transform.position = position;
+
+        if (itemHitTimer <= 0.0f)
+        {
+            // snap back to NavMesh after flying
+            if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 3.0f, NavMesh.AllAreas))
+            {
+                transform.position = hit.position;
+            }
+
+            if (agent != null)
+            {
+                agent.Warp(transform.position);
+                agent.isStopped = true;
+                agent.ResetPath();
+                agent.velocity = Vector3.zero;
+            }
+
+            currentSpeed = 0.0f;
+
+            isFlyingFromItem = false;
+            isStoppedAfterItemHit = true;
+
+            itemHitTimer = itemStunAfterFlyTime;
+        }
+    }
+
+    private void UpdateStopAfterItemHit()
+    {
+        itemHitTimer -= Time.deltaTime;
+
+        if (agent != null)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+            agent.speed = 0.0f;
+        }
+
+        currentSpeed = 0.0f;
+
+        if (itemHitTimer <= 0.0f)
+        {
+            EndItemStun();
+        }
     }
 
     private Transform FindNearbyRacerForItem()
